@@ -121,11 +121,17 @@ st.markdown("Converta seus PDFs em Markdown usando IA avançada")
 with st.sidebar:
     st.header("⚙️ Configurações")
     
+    # Tentar obter API key de st.secrets (produção) ou input (desenvolvimento)
+    try:
+        default_api_key = st.secrets["LLAMA_PARSE_API_KEY"]
+    except:
+        default_api_key = ""
+    
     api_key = st.text_input(
         "API Key LlamaParse",
-        value="llx-5Fq2oMo4Q43L6W69bCq5EEMxn57FT573OHfnVjhNF527N6us",
+        value=default_api_key,
         type="password",
-        help="Insira sua chave API do LlamaParse"
+        help="Insira sua chave API do LlamaParse (ou configure em Secrets)"
     )
     st.session_state.api_key = api_key
     
