@@ -100,18 +100,41 @@ def get_unprocessed_files():
 def process_pdf(file_path, output_path, parser):
     """Process a single PDF file"""
     try:
+        # Verify file exists and is readable
+        if not os.path.exists(file_path):
+            return False, f"Ficheiro não encontrado: {file_path}"
+        
+        # Get file size to verify upload was successful
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
+            return False, "Ficheiro vazio (0 bytes) - upload falhou"
+        
+        # Log file info
+        st.write(f"📌 Ficheiro: {os.path.basename(file_path)} ({file_size} bytes)")
+        
+        # Process with LlamaParse
         with open(file_path, "rb") as f:
-            extra_info = {"file_name": file_path}
+            extra_info = {"file_name": os.path.basename(file_path)}
             documents = parser.load_data(f, extra_info=extra_info)
         
+        # Verify we got results
+        if not documents or len(documents) == 0:
+            return False, "LlamaParse não conseguiu extrair conteúdo do PDF"
+        
         # Write to markdown file
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
             for doc in documents:
                 f.write(doc.text)
         
-        return True, "Processado com sucesso"
+        return True, f"Sucesso: {len(documents)} página(s) processada(s)"
+    
+    except FileNotFoundError as e:
+        return False, f"Ficheiro não encontrado: {str(e)}"
+    except IOError as e:
+        return False, f"Erro ao ler ficheiro: {str(e)}"
     except Exception as e:
-        return False, str(e)
+        return False, f"Erro ao processar: {str(e)}"
 
 # Header
 st.title("📄 LlamaParse PDF Converter")
@@ -189,8 +212,18 @@ with tab1:
                             docs_folder = "docs"
                             file_path = os.path.join(docs_folder, uploaded_file.name)
                             
+                            # Ensure directory exists
+                            os.makedirs(docs_folder, exist_ok=True)
+                            
+                            # Save file and verify
                             with open(file_path, "wb") as f:
-                                f.write(uploaded_file.getbuffer())
+                                bytes_written = f.write(uploaded_file.getbuffer())
+                            
+                            if bytes_written == 0:
+                                with results_container.container():
+                                    st.markdown(f'<div class="error-box">✗ <b>{uploaded_file.name}</b>: Upload falhou (0 bytes)</div>', unsafe_allow_html=True)
+                                failed += 1
+                                continue
                             
                             # Process the file
                             output_file = uploaded_file.name.replace('.pdf', '.md')
@@ -200,16 +233,16 @@ with tab1:
                             
                             if success:
                                 with results_container.container():
-                                    st.markdown(f'<div class="success-box">✓ <b>{uploaded_file.name}</b> → salvo como {output_file}</div>', unsafe_allow_html=True)
+                                    st.markdown(f'<div class="success-box">✓ <b>{uploaded_file.name}</b> → {output_file}<br><small>{message}</small></div>', unsafe_allow_html=True)
                                 successful += 1
                             else:
                                 with results_container.container():
-                                    st.markdown(f'<div class="error-box">✗ Erro ao processar <b>{uploaded_file.name}</b>: {message}</div>', unsafe_allow_html=True)
+                                    st.markdown(f'<div class="error-box">✗ <b>{uploaded_file.name}</b>: {message}</div>', unsafe_allow_html=True)
                                 failed += 1
                         
                         except Exception as e:
                             with results_container.container():
-                                st.markdown(f'<div class="error-box">✗ Erro ao processar <b>{uploaded_file.name}</b>: {str(e)}</div>', unsafe_allow_html=True)
+                                st.markdown(f'<div class="error-box">✗ <b>{uploaded_file.name}</b>: {str(e)}</div>', unsafe_allow_html=True)
                             failed += 1
                     
                     status_text.empty()
